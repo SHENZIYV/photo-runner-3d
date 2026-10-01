@@ -107,7 +107,7 @@ function renderFrame(state: RunState, dt: number): boolean {
   });
 
   energyViews.forEach((view) => {
-    const cycle = (view.base + state.distance * 0.35) % 78;
+    const cycle = ((view.base - state.distance * 0.35) % 78 + 78) % 78;
     const z = 3.4 - cycle;
     view.mesh.position.set(view.lane * 2, 1.2, z);
     view.mesh.rotation.y += dt * 2.6;
