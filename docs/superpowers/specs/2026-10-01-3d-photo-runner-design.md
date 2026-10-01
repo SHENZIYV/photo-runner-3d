@@ -2,7 +2,7 @@
 
 ## Goal
 
-Build a mobile-friendly browser endless runner in which the three supplied photos represent selectable playable characters. The game uses a real 3D track, camera, lighting, obstacles, and character meshes. It runs in a normal mobile browser without a native app install.
+Build a mobile-friendly browser endless runner in which two supplied multi-angle character references represent selectable playable characters. The game uses a real 3D track, camera, lighting, obstacles, and character meshes. It runs in a normal mobile browser without a native app install.
 
 The first character is Yang Hang, represented by `0bddcb6a916be752b92c31f67ee38c0d.jpg`. Yang Hang has a unique full-energy ability: he mounts a stylized open-wheel F1-style car and performs a short high-speed sprint with nitro flames, speed lines, and a closer chase camera.
 
@@ -13,11 +13,11 @@ The first character is Yang Hang, represented by `0bddcb6a916be752b92c31f67ee38c
 - The world uses a compact night campus/city circuit so the track reads clearly on phone screens.
 - Characters are complete rotatable low-poly meshes assembled from reusable body parts and photo-based face, hair, glasses, and clothing textures. This keeps the characters real 3D objects while avoiding an unreliable automatic full-body scan.
 - The first version ships with local best score only. No account, server, or external photo upload is required.
-- The other two characters are selectable and playable with the shared movement kit; their unique abilities remain future extension points.
+- The second character is selectable and playable with the shared movement kit; unique abilities remain future extension points.
 
 ## Player loop
 
-1. Character select shows three photo-backed 3D character previews.
+1. Character select shows two photo-backed 3D character previews.
 2. The selected character starts running automatically.
 3. The player changes lanes, jumps, and slides to avoid obstacles and collect energy.
 4. Distance increases score. Near misses and energy pickups increase the energy meter.
@@ -68,7 +68,7 @@ DOM owns text, controls, menus, and accessibility-sensitive actions. Three.js ow
 
 ## Character and photo asset strategy
 
-The three supplied JPGs are copied into `public/assets/characters/` with stable manifest keys. A browser-side canvas compositor creates a face/torso atlas at a bounded resolution, preserving the source photo while adding a simple transparent trim and color correction. The mesh factory applies these textures to a head/upper-body model and combines them with low-poly body parts, shoes, and accessories. Each character is one `THREE.Group` with explicit pivots so it can rotate and animate without changing simulation state.
+The two supplied characters have stable manifest keys and reference sheets under `public/assets/characters/reference/`. The runtime first attempts to load `yang-hang.glb` or `runner-02.glb` with Meshopt decoding; until those Blender exports exist, it uses a programmatic 3D fallback and keeps the JPG menu portraits. Each character is one `THREE.Group` with explicit pivots so it can rotate and animate without changing simulation state.
 
 Yang Hang's F1 state swaps the runner body for a reusable open-wheel car group, keeps the face portrait visible above the cockpit, and attaches an exhaust emitter and speed-line rig. The car is a generic open-wheel shape with no real team branding.
 

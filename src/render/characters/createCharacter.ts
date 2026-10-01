@@ -6,12 +6,24 @@ import { createNitroFx, type NitroFx } from "../fx/nitro";
 import { createSpeedLinesFx, type SpeedLinesFx } from "../fx/speedLines";
 
 function disposeObjectTree(root: THREE.Object3D): void {
+  const geometries = new Set<THREE.BufferGeometry>();
+  const materialSet = new Set<THREE.Material>();
+  const textures = new Set<THREE.Texture>();
   root.traverse((object) => {
     const drawable = object as THREE.Mesh;
-    drawable.geometry?.dispose();
-    const materials = Array.isArray(drawable.material) ? drawable.material : [drawable.material];
-    materials.filter(Boolean).forEach((material) => material.dispose());
+    if (drawable.geometry) geometries.add(drawable.geometry);
+    const objectMaterials = Array.isArray(drawable.material) ? drawable.material : [drawable.material];
+    objectMaterials.filter(Boolean).forEach((material) => {
+      if (!material) return;
+      materialSet.add(material);
+      Object.values(material as unknown as Record<string, unknown>).forEach((value) => {
+        if (value instanceof THREE.Texture) textures.add(value);
+      });
+    });
   });
+  geometries.forEach((geometry) => geometry.dispose());
+  textures.forEach((texture) => texture.dispose());
+  materialSet.forEach((material) => material.dispose());
 }
 
 export interface CharacterView {
@@ -21,6 +33,7 @@ export interface CharacterView {
   nitro: NitroFx;
   speedLines: SpeedLinesFx;
   setPhotoTexture(texture: THREE.Texture): void;
+  setModel(model: THREE.Object3D, clips?: THREE.AnimationClip[]): void;
   sync(state: RunState, dt: number): void;
   dispose(): void;
 }
@@ -91,6 +104,16 @@ export function createCharacter(definition: CharacterDefinition, geometryDetail 
   const speedLines = createSpeedLinesFx(speedLineCount);
   group.add(nitro.group, speedLines.group);
   let photoTexture: THREE.Texture | null = null;
+  let importedModel: THREE.Object3D | null = null;
+  let mixer: THREE.AnimationMixer | null = null;
+  const actions = new Map<string, THREE.AnimationAction>();
+  let activeAction: THREE.AnimationAction | null = null;
+
+  function selectAction(state: RunState): THREE.AnimationAction | null {
+    if (actions.size === 0) return null;
+    const requestedName = state.isSliding ? "slide" : state.isJumping ? "jump" : "run";
+    return actions.get(requestedName) ?? actions.get("idle") ?? actions.values().next().value ?? null;
+  }
 
   return {
     group,
@@ -105,12 +128,59 @@ export function createCharacter(definition: CharacterDefinition, geometryDetail 
       material.map = texture;
       material.needsUpdate = true;
     },
+    setModel(model, clips = []) {
+      if (importedModel) {
+        group.remove(importedModel);
+        disposeObjectTree(importedModel);
+        importedModel = null;
+      }
+      importedModel = model;
+      importedModel.name = importedModel.name || "ImportedCharacter";
+      importedModel.position.set(0, 0, 0);
+      importedModel.rotation.set(0, 0, 0);
+      importedModel.traverse((object) => {
+        const drawable = object as THREE.Mesh;
+        if (drawable.isMesh) {
+          drawable.castShadow = false;
+          drawable.receiveShadow = false;
+        }
+      });
+      group.add(importedModel);
+      body.visible = false;
+      portrait.visible = false;
+      mixer?.stopAllAction();
+      mixer = clips.length > 0 ? new THREE.AnimationMixer(importedModel) : null;
+      actions.clear();
+      activeAction = null;
+      clips.forEach((clip) => {
+        const key = clip.name.trim().toLowerCase();
+        if (key) actions.set(key, mixer!.clipAction(clip));
+      });
+      const initialAction = actions.get("idle") ?? actions.get("run") ?? actions.values().next().value;
+      if (initialAction) {
+        initialAction.play();
+        activeAction = initialAction;
+      }
+    },
     sync(state, dt) {
       group.position.x = state.lane * 2;
       group.position.y = state.y;
-      body.visible = true;
-      body.scale.setScalar(state.sprintRemaining > 0 ? 0.72 : 1);
-      body.position.y = state.sprintRemaining > 0 ? 0.9 : 0;
+      if (importedModel) {
+        importedModel.visible = true;
+        importedModel.scale.setScalar(state.sprintRemaining > 0 ? 0.72 : 1);
+        importedModel.position.y = state.sprintRemaining > 0 ? 0.9 : 0;
+        const nextAction = selectAction(state);
+        if (nextAction && nextAction !== activeAction) {
+          activeAction?.fadeOut(0.12);
+          nextAction.reset().fadeIn(0.12).play();
+          activeAction = nextAction;
+        }
+        mixer?.update(dt);
+      } else {
+        body.visible = true;
+        body.scale.setScalar(state.sprintRemaining > 0 ? 0.72 : 1);
+        body.position.y = state.sprintRemaining > 0 ? 0.9 : 0;
+      }
       car.group.visible = state.sprintRemaining > 0;
       if (car.group.visible) {
         car.update(dt);
@@ -120,16 +190,19 @@ export function createCharacter(definition: CharacterDefinition, geometryDetail 
       speedLines.setActive(state.speedLines);
       nitro.update(dt);
       speedLines.update(dt);
-      body.rotation.z = THREE.MathUtils.lerp(body.rotation.z, state.isJumping ? -0.08 : state.isSliding ? 0.12 : 0, 0.18);
-      leftArm.rotation.x = state.isSliding ? -0.4 : 0;
-      rightArm.rotation.x = state.isSliding ? -0.4 : 0;
-      leftLeg.rotation.x = Math.sin(performance.now() * 0.012) * 0.25;
-      rightLeg.rotation.x = -leftLeg.rotation.x;
+      if (!importedModel) {
+        body.rotation.z = THREE.MathUtils.lerp(body.rotation.z, state.isJumping ? -0.08 : state.isSliding ? 0.12 : 0, 0.18);
+        leftArm.rotation.x = state.isSliding ? -0.4 : 0;
+        rightArm.rotation.x = state.isSliding ? -0.4 : 0;
+        leftLeg.rotation.x = Math.sin(performance.now() * 0.012) * 0.25;
+        rightLeg.rotation.x = -leftLeg.rotation.x;
+      }
     },
     dispose() {
       disposeObjectTree(group);
-      photoTexture?.dispose();
       photoTexture = null;
+      mixer?.stopAllAction();
+      mixer = null;
       car.dispose();
       group.clear();
     },

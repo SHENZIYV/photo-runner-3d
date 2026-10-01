@@ -3,6 +3,7 @@ import { createGameApp, type GameApp } from "./render/app/createGameApp";
 import { getDeviceQualityHints, getQualityProfile } from "./render/app/quality";
 import { createCharacter, type CharacterView } from "./render/characters/createCharacter";
 import { CHARACTERS } from "./render/characters/characterManifest";
+import { isCharacterModelAvailable, loadCharacterModel } from "./render/characters/loadCharacterModel";
 import { loadPhotoTexture } from "./render/characters/photoTexture";
 import { getCharacterAnchorPosition } from "./render/characters/transform";
 import { createObstacle } from "./render/world/obstacles";
@@ -86,6 +87,16 @@ function mountCharacter(characterId: string) {
       if (activeCharacter === character) character.setPhotoTexture(texture);
     })
     .catch(() => app.setFallback("角色照片加载失败，请刷新页面重试。"));
+  void isCharacterModelAvailable(definition.modelPath).then((available) => {
+    if (!available) return;
+    return loadCharacterModel(definition.modelPath)
+      .then(({ root, clips }) => {
+        if (activeCharacter === character) character.setModel(root, clips);
+      })
+      .catch(() => {
+        // The procedural character remains playable if a GLB cannot be decoded.
+      });
+  });
 }
 
 function renderFrame(state: RunState, dt: number): boolean {
