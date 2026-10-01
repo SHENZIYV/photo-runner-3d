@@ -42,7 +42,7 @@ export function createTrack(): TrackView {
     group,
     scroll(distance) {
       const offset = (distance * 0.35) % 160;
-      group.position.z = offset > 0 ? -offset : 0;
+      group.position.z = offset > 0 ? offset : 0;
     },
     dispose() {
       group.clear();
