@@ -68,17 +68,20 @@ export function createCharacter(definition: CharacterDefinition, geometryDetail 
     new THREE.PlaneGeometry(0.58, 0.72),
     new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, side: THREE.DoubleSide }),
   );
-  portrait.position.set(0, 1.95, 0.37);
+  portrait.position.set(0, 1.95, -0.37);
   body.add(portrait);
 
   const glassesMaterial = new THREE.MeshBasicMaterial({ color: 0x16232b, transparent: true, opacity: 0.9 });
   const glasses = new THREE.Group();
   for (const x of [-0.14, 0.14]) {
     const lens = new THREE.Mesh(new THREE.TorusGeometry(0.105, 0.018, 5, Math.max(8, Math.round(16 * geometryDetail))), glassesMaterial);
-    lens.position.set(x, 2.02, 0.405);
+    lens.position.set(x, 2.02, -0.405);
     glasses.add(lens);
   }
   body.add(glasses);
+  // The chase camera is behind the runner. Keep the photo as a camera-facing
+  // presentation layer while the body and its movement use the forward -Z axis.
+  body.rotation.y = Math.PI;
   group.add(body);
 
   const car = createF1Car();
