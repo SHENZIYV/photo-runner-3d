@@ -6,4 +6,8 @@ describe("runner obstacle spacing", () => {
 
     expect(opening.some((z) => isObstacleCollision(z, 0, 0, false, false))).toBe(false);
   });
+
+  it("moves obstacles toward the camera as distance advances", () => {
+    expect(getObstacleZ(31, 1)).toBeGreaterThan(getObstacleZ(31, 0));
+  });
 });
